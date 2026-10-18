@@ -75,4 +75,10 @@ godot --headless --path . --export-release Linux
 godot --headless --path . --export-release Web
 ```
 
-All character geometry, scenery, and audio are original to this project. Red Hat Display and the Adwaita Sans symbol fallback are bundled under the SIL Open Font License; see the license files in `assets/fonts/`. SkiFree is a gameplay reference, with no reused game assets.
+## License
+
+Snow Pals's code and original art and audio are licensed under the **GNU Affero General Public License, version 3 or later** (`AGPL-3.0-or-later`). See [LICENSE.txt](LICENSE.txt) for the full terms and [NOTICE.txt](NOTICE.txt) for the copyright and license notice. The source is available at [tsloughter/skilibre](https://github.com/tsloughter/skilibre). When distributing builds, provide the corresponding source for that build as required by the AGPL.
+
+The main menu's **Licenses** button displays the project license, font notices, and the running Godot engine's license and third-party notices. Both Linux and Web export presets include the project and font license files in the game data.
+
+Godot Engine is available under the [MIT license](https://godotengine.org/license). Red Hat Display and the Adwaita Sans symbol fallback are bundled under the SIL Open Font License 1.1; see [assets/fonts/LICENSE.txt](assets/fonts/LICENSE.txt) and [assets/fonts/SYMBOLS-LICENSE.txt](assets/fonts/SYMBOLS-LICENSE.txt). These components retain their own licenses. All character geometry, scenery, and audio are original to this project. SkiFree is a gameplay reference, with no reused game assets.

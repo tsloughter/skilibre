@@ -3,6 +3,7 @@ config_version=5
 
 [application]
 config/name="Snow Pals"
+config/description="A gentle downhill skiing game. Licensed under GNU AGPL v3 or later (AGPL-3.0-or-later); see LICENSE.txt and the Licenses menu."
 run/main_scene="res://main.tscn"
 config/features=PackedStringArray("4.5", "GL Compatibility")
 config/icon="res://assets/icon.svg"

@@ -41,6 +41,7 @@ var portraits: Array[SubViewport] = []
 var play_button: Button
 var message_time := 0.0
 var touch_actions: Dictionary = {}
+var licenses_dialog: AcceptDialog
 
 func _ready() -> void:
 	BOLD.set_fallbacks([SYMBOLS])
@@ -140,6 +141,45 @@ func _build_menu() -> void:
 	pal_description = label(menu, DESCRIPTIONS[0], Rect2(690,207,480,30), 18, MUTED, false, true)
 	panel(menu, Rect2(821,678,304,60), Color("fffdf5e8"), 30)
 	label(menu, "Fresh snow. Happy little feet.", Rect2(821,678,304,60), 17, TEAL, true, true)
+	var licenses := button(menu, "Licenses", Rect2(1120,744,132,40), false, 16)
+	licenses.pressed.connect(_show_licenses)
+
+func _show_licenses() -> void:
+	if not is_instance_valid(licenses_dialog):
+		licenses_dialog = AcceptDialog.new()
+		licenses_dialog.title = "Snow Pals — Licenses"
+		licenses_dialog.ok_button_text = "Close"
+		licenses_dialog.dialog_hide_on_ok = true
+		licenses_dialog.add_theme_font_override("font", REGULAR)
+		add_child(licenses_dialog)
+		licenses_dialog.visibility_changed.connect(func():
+			if not licenses_dialog.visible: play_button.grab_focus())
+		var tabs := TabContainer.new()
+		tabs.custom_minimum_size = Vector2(960,560)
+		licenses_dialog.add_child(tabs)
+		_license_page(tabs, "Snow Pals", FileAccess.get_file_as_string("res://NOTICE.txt") + "\n\n" + FileAccess.get_file_as_string("res://LICENSE.txt"))
+		_license_page(tabs, "Fonts", "Red Hat Display\n\n" + FileAccess.get_file_as_string("res://assets/fonts/LICENSE.txt") + "\n\nAdwaita Sans symbol fallback\n\n" + FileAccess.get_file_as_string("res://assets/fonts/SYMBOLS-LICENSE.txt"))
+		_license_page(tabs, "Godot Engine", Engine.get_license_text())
+		var notices := "Godot Engine third-party components\n\n"
+		for component in Engine.get_copyright_info():
+			notices += component.name + "\n"
+			for part in component.parts:
+				notices += "Files: " + ", ".join(part.files) + "\n"
+				notices += "\n".join(part.copyright) + "\nLicense: " + part.license + "\n\n"
+		var engine_licenses := Engine.get_license_info()
+		for license_name in engine_licenses:
+			notices += license_name + "\n\n" + engine_licenses[license_name] + "\n\n"
+		_license_page(tabs, "Godot dependencies", notices)
+	licenses_dialog.popup_centered()
+
+func _license_page(tabs: TabContainer, title: String, text: String) -> void:
+	var page := RichTextLabel.new()
+	page.name = title
+	page.text = text
+	page.selection_enabled = true
+	page.add_theme_font_override("normal_font", REGULAR)
+	page.add_theme_font_size_override("normal_font_size", 16)
+	tabs.add_child(page)
 
 func _add_portrait(parent: Control, kind: String) -> void:
 	var viewport := SubViewport.new()

@@ -38,6 +38,19 @@ func run() -> void:
 	current_scene = game
 	await process_frame
 	game.set_process(false)
+	await click(Vector2(1180,764))
+	check(game.ui.licenses_dialog.visible,"licenses button opens the license dialog")
+	var license_tabs: TabContainer
+	for child in game.ui.licenses_dialog.get_children():
+		if child is TabContainer: license_tabs = child
+	check(license_tabs != null and license_tabs.get_tab_count()==4,"license dialog exposes project, fonts, engine, and dependencies")
+	if license_tabs != null:
+		check("GNU AFFERO GENERAL PUBLIC LICENSE" in license_tabs.get_child(0).text,"project tab includes the full AGPL")
+		check("SIL OPEN FONT LICENSE" in license_tabs.get_child(1).text,"font tab includes the bundled font licenses")
+		check(Engine.get_license_text() in license_tabs.get_child(2).text,"engine tab includes the running engine license")
+	await press(KEY_ESCAPE)
+	check(not game.ui.licenses_dialog.visible,"Escape closes the license dialog")
+	check(root.gui_get_focus_owner()==game.ui.play_button,"closing licenses restores keyboard start focus")
 	await click(Vector2(240,340))
 	check(game.selected_pal==1,"portrait hit target chooses Clover")
 	await click(Vector2(420,525))

@@ -1,0 +1,29 @@
+Snow Pals
+Copyright (C) 2026 Tristan Sloughter
+SPDX-License-Identifier: AGPL-3.0-or-later
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published
+by the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program, in LICENSE.txt. If not, see
+https://www.gnu.org/licenses/.
+
+Source code: https://github.com/tsloughter/skilibre
+
+This license covers the project's code and original art and audio.
+Godot Engine and the bundled fonts retain their own licenses:
+
+- Godot Engine: MIT, https://godotengine.org/license
+  The Licenses menu displays the running engine's license and third-party
+  copyright notices and licenses.
+- Red Hat Display: SIL Open Font License 1.1, assets/fonts/LICENSE.txt
+- Adwaita Sans symbol fallback: SIL Open Font License 1.1,
+  assets/fonts/SYMBOLS-LICENSE.txt

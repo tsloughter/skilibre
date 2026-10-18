@@ -135,7 +135,7 @@ func _build_menu() -> void:
 	play_button = button(menu, "Let’s ski!    →", Rect2(64,588,478,70), true, 28)
 	play_button.pressed.connect(func(): play_requested.emit())
 	label(menu, "←  →   Steer     ↑   Slow     SPACE   Hop", Rect2(64,682,478,25), 16, MUTED, false, true)
-	label(menu, "Mouse & touch work too. Take your time!", Rect2(64,711,478,22), 14, MUTED, false, true)
+	label(menu, "Controller: stick / D-pad · A hop · + pause", Rect2(64,711,478,22), 14, MUTED, false, true)
 	label(menu, "THE MOUNTAIN IS YOURS", Rect2(690,116,480,24), 13, TEAL, true, true)
 	pal_title = label(menu, "Meet Pip.", Rect2(690,147,480,58), 44, INK, true, true)
 	pal_description = label(menu, DESCRIPTIONS[0], Rect2(690,207,480,30), 18, MUTED, false, true)
@@ -229,7 +229,7 @@ func _build_hud() -> void:
 	panel(hud, Rect2(916,26,122,62), CREAM, 22)
 	star_label = label(hud, "★  0", Rect2(926,30,102,50), 28, Color("a87524"), true, true)
 	var pause_btn := button(hud, "Ⅱ", Rect2(1052,28,58,58), false, 28)
-	pause_btn.tooltip_text = "Take a break (Esc or P)"
+	pause_btn.tooltip_text = "Take a break (Esc, P or +)"
 	pause_btn.pressed.connect(func(): pause_requested.emit())
 	message_label = label(hud, "Follow the stars!", Rect2(320,118,640,42), 26, TEAL, true, true)
 	message_label.add_theme_color_override("font_shadow_color", Color("ffffff"))
@@ -246,7 +246,7 @@ func _build_hud() -> void:
 	brake.button_up.connect(func(): brake_held = false)
 	var jump := button(hud, "Hop ↑", Rect2(1114,678,138,88), true, 26)
 	jump.pressed.connect(func(): hop_requested.emit())
-	label(hud, "← →  STEER     ↑  SLOW     SPACE  HOP", Rect2(320,739,640,28), 15, MUTED, true, true)
+	label(hud, "← →  STEER    ↑  SLOW    SPACE / A  HOP    +  PAUSE", Rect2(320,739,640,28), 15, MUTED, true, true)
 
 func select_pal(index: int) -> void:
 	for i in range(cards.size()):

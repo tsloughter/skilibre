@@ -20,16 +20,18 @@ Then visit `http://localhost:8000`. A browser with WebGL 2 is required. The firs
 
 ## Controls
 
-| Action | Keyboard | Mouse / touch |
-| --- | --- | --- |
-| Steer | Left / right arrows, or A / D | Move the mouse over the snow, drag on the slope, or hold the large arrow buttons |
-| Slow to a stop | Hold up arrow or W | Hold **Slow** |
-| Glide a little faster | Hold down arrow or S | — |
-| Hop | Space | **Hop ↑** button; ramps also hop automatically |
-| Pause / resume | Esc or P | Pause button, then **Keep skiing** |
-| Sound | M | **Sound on/off** |
-| Fullscreen | F11 | — |
-| Choose and start | Tab / Shift+Tab, then Enter | Click/tap a pal, a pace, then **Let’s ski!** |
+| Action | Keyboard | Switch Pro Controller | Mouse / touch |
+| --- | --- | --- | --- |
+| Steer | Left / right arrows, or A / D | Left stick or D-pad left / right | Move the mouse over the snow, drag on the slope, or hold the large arrow buttons |
+| Slow to a stop | Hold up arrow or W | Hold left stick or D-pad up | Hold **Slow** |
+| Glide a little faster | Hold down arrow or S | Hold left stick or D-pad down | — |
+| Hop | Space | **A** (right face button) | **Hop ↑** button; ramps also hop automatically |
+| Pause / resume | Esc or P | **+** | Pause button, then **Keep skiing** |
+| Sound | M | Select the sound button in the menu | **Sound on/off** |
+| Fullscreen | F11 | — | — |
+| Choose and start | Tab / Shift+Tab, then Enter | Left stick / D-pad, then **A** | Click/tap a pal, a pace, then **Let’s ski!** |
+
+Connect or pair the controller before or during play. The printed Nintendo **A** button confirms menu choices and jumps during skiing; **B** closes the license dialog. The left stick has a deadzone to prevent drift, and controller steering takes over from mouse steering immediately.
 
 Touch controls track fingers separately, allowing a hop while holding a steering button. Keyboard input takes over from mouse steering immediately. Leaving the game window pauses the run.
 
@@ -62,6 +64,7 @@ Run the checks:
 ```sh
 godot --headless --path . --script tests/game_test.gd -- --test
 godot --headless --path . --script tests/ui_test.gd -- --test
+godot --headless --path . --script tests/controller_test.gd -- --test
 godot --headless --path . --script tests/crash_test.gd -- --test
 ```
 

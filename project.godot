@@ -23,5 +23,41 @@ textures/default_filters/use_nearest_mipmap_filter=false
 anti_aliasing/quality/msaa_3d=2
 environment/defaults/default_clear_color=Color(0.83, 0.92, 0.94, 1)
 
+[input]
+
+; Nintendo A is the right face button (SDL/Godot button 1).
+ui_accept={
+"deadzone": 0.25,
+"events": [Object(InputEventKey,"keycode":4194309), Object(InputEventKey,"keycode":4194310), Object(InputEventKey,"keycode":32), Object(InputEventJoypadButton,"device":-1,"button_index":1)]
+}
+ui_cancel={
+"deadzone": 0.25,
+"events": [Object(InputEventKey,"keycode":4194305), Object(InputEventJoypadButton,"device":-1,"button_index":0)]
+}
+ski_left={
+"deadzone": 0.25,
+"events": [Object(InputEventKey,"physical_keycode":4194319), Object(InputEventKey,"physical_keycode":65), Object(InputEventJoypadButton,"device":-1,"button_index":13), Object(InputEventJoypadMotion,"device":-1,"axis":0,"axis_value":-1.0)]
+}
+ski_right={
+"deadzone": 0.25,
+"events": [Object(InputEventKey,"physical_keycode":4194321), Object(InputEventKey,"physical_keycode":68), Object(InputEventJoypadButton,"device":-1,"button_index":14), Object(InputEventJoypadMotion,"device":-1,"axis":0,"axis_value":1.0)]
+}
+ski_slow={
+"deadzone": 0.25,
+"events": [Object(InputEventKey,"physical_keycode":4194320), Object(InputEventKey,"physical_keycode":87), Object(InputEventJoypadButton,"device":-1,"button_index":11), Object(InputEventJoypadMotion,"device":-1,"axis":1,"axis_value":-1.0)]
+}
+ski_fast={
+"deadzone": 0.25,
+"events": [Object(InputEventKey,"physical_keycode":4194322), Object(InputEventKey,"physical_keycode":83), Object(InputEventJoypadButton,"device":-1,"button_index":12), Object(InputEventJoypadMotion,"device":-1,"axis":1,"axis_value":1.0)]
+}
+ski_hop={
+"deadzone": 0.25,
+"events": [Object(InputEventKey,"keycode":32), Object(InputEventJoypadButton,"device":-1,"button_index":1)]
+}
+ski_pause={
+"deadzone": 0.25,
+"events": [Object(InputEventKey,"keycode":4194305), Object(InputEventKey,"keycode":80), Object(InputEventJoypadButton,"device":-1,"button_index":6)]
+}
+
 [input_devices]
 pointing/emulate_mouse_from_touch=true

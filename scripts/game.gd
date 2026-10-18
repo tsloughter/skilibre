@@ -314,6 +314,18 @@ func hop() -> void:
 	jump_time = .9
 	_play_sound("hop")
 
+func _input(event: InputEvent) -> void:
+	if not (event is InputEventJoypadButton or event is InputEventJoypadMotion): return
+	# Handle gameplay before the GUI: A always hops, even if a HUD button has focus.
+	if event.is_action_pressed("ski_pause"):
+		if state in [State.SKIING,State.CRASHED]: pause_run()
+		elif state == State.PAUSED: resume_run()
+		get_viewport().set_input_as_handled()
+	elif state in [State.SKIING,State.CRASHED]:
+		if event.is_action_pressed("ski_hop"): hop()
+		# Stick/D-pad navigation belongs to menus only; gameplay polls these actions.
+		get_viewport().set_input_as_handled()
+
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode in [KEY_ESCAPE,KEY_P]:
@@ -364,9 +376,10 @@ func _process(delta: float) -> void:
 		if crash_time <= 0: _respawn_after_crash()
 		return
 	recovery_time = maxf(0,recovery_time-dt)
-	var axis := 0.0
-	if Input.is_physical_key_pressed(KEY_LEFT) or Input.is_physical_key_pressed(KEY_A) or ui.left_held: axis -= 1
-	if Input.is_physical_key_pressed(KEY_RIGHT) or Input.is_physical_key_pressed(KEY_D) or ui.right_held: axis += 1
+	var axis := Input.get_axis("ski_left", "ski_right")
+	if ui.left_held: axis -= 1
+	if ui.right_held: axis += 1
+	axis = clampf(axis,-1,1)
 	if axis != 0: mouse_steering = false
 	if mouse_steering: axis = clampf((mouse_target-skier.position.x)*.7,-1,1)
 	# Youngest setting gently nudges around obstacles, but still permits steering.
@@ -377,9 +390,9 @@ func _process(delta: float) -> void:
 			var side: float = skier.position.x - item.node.position.x
 			if ahead > 0 and ahead < 4.8 and absf(side) < 1.7:
 				axis = clampf(axis + (1.0 if side >= 0 else -1.0)*(1.0-ahead/4.8)*.85,-1,1)
-	var braking: bool = Input.is_physical_key_pressed(KEY_UP) or Input.is_physical_key_pressed(KEY_W) or ui.brake_held
+	var braking: bool = Input.is_action_pressed("ski_slow") or ui.brake_held
 	var target_speed := 5.3 if pace==0 else 8.0
-	if Input.is_physical_key_pressed(KEY_DOWN) or Input.is_physical_key_pressed(KEY_S): target_speed *= 1.18
+	if Input.is_action_pressed("ski_fast"): target_speed *= 1.18
 	if braking: target_speed = 0.0
 	speed = move_toward(speed,target_speed,dt*7.0)
 	steer = lerpf(steer,axis,1.0-exp(-dt*7))

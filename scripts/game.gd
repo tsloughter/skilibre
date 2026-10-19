@@ -309,10 +309,11 @@ func resume_run() -> void:
 	ui.show_game()
 	ui.toast("A little tumble! Back up in a moment." if crash_time > 0 else "Off we go!", maxf(crash_time,1.5))
 
-func hop() -> void:
-	if state != State.SKIING or jump_time > 0: return
+func hop() -> bool:
+	if state != State.SKIING or jump_time > 0: return false
 	jump_time = .9
 	_play_sound("hop")
+	return true
 
 func _input(event: InputEvent) -> void:
 	if not (event is InputEventJoypadButton or event is InputEventJoypadMotion): return
@@ -510,8 +511,7 @@ func _update_items(dt: float) -> void:
 				node.position.x = move_toward(node.position.x,skier.position.x,dt*2)
 		elif item.kind=="ramp" and absf(dx)<1.5 and absf(dz)<.8:
 			item.active = false
-			hop()
-			ui.toast("Wheee!",1.4)
+			if hop(): ui.toast("Wheee!",1.4)
 		elif item.kind in ["pine","rock"] and absf(dx)<1.05 and absf(dz)<1.05 and jump_time<.1 and recovery_time<=0:
 			item.active = false
 			_begin_crash(node)
@@ -539,7 +539,8 @@ func _update_trails(dt: float) -> void:
 func _burst(pos: Vector3, material: String, count: int) -> void:
 	for i in range(count):
 		var p := _ball(trail_root,pos,Vector3.ONE*.12,material)
-		particles.append({"node":p,"life":.7,"velocity":Vector3(course_rng.randf_range(-2,2),course_rng.randf_range(1,3),course_rng.randf_range(-2,2))})
+		# Global RNG keeps the seeded course layout identical from run to run.
+		particles.append({"node":p,"life":.7,"velocity":Vector3(randf_range(-2,2),randf_range(1,3),randf_range(-2,2))})
 
 func _update_particles(dt: float) -> void:
 	for i in range(particles.size()-1,-1,-1):
@@ -574,6 +575,9 @@ func _build_audio() -> void:
 	music.play()
 
 func _exit_tree() -> void:
+	_stop_audio()
+
+func _stop_audio() -> void:
 	if is_instance_valid(music):
 		music.stop()
 		music.stream = null
@@ -632,6 +636,6 @@ func _capture() -> void:
 		set_process(false)
 	await RenderingServer.frame_post_draw
 	get_viewport().get_texture().get_image().save_png("res://screenshots/%s.png" % capture_mode)
-	_exit_tree()
+	_stop_audio()
 	await get_tree().create_timer(.2).timeout
 	get_tree().quit()

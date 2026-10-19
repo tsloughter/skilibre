@@ -34,6 +34,11 @@ ui_cancel={
 "deadzone": 0.25,
 "events": [Object(InputEventKey,"keycode":4194305), Object(InputEventJoypadButton,"device":-1,"button_index":0)]
 }
+; Godot 4.7+ closes dialogs on ui_close_dialog instead of ui_cancel.
+ui_close_dialog={
+"deadzone": 0.25,
+"events": [Object(InputEventKey,"keycode":4194305), Object(InputEventJoypadButton,"device":-1,"button_index":0)]
+}
 ski_left={
 "deadzone": 0.25,
 "events": [Object(InputEventKey,"physical_keycode":4194319), Object(InputEventKey,"physical_keycode":65), Object(InputEventJoypadButton,"device":-1,"button_index":13), Object(InputEventJoypadMotion,"device":-1,"axis":0,"axis_value":-1.0)]

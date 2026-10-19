@@ -41,6 +41,7 @@ var portraits: Array[SubViewport] = []
 var play_button: Button
 var message_time := 0.0
 var touch_actions: Dictionary = {}
+var touch_buttons: Dictionary = {}
 var licenses_dialog: AcceptDialog
 
 func _ready() -> void:
@@ -246,6 +247,7 @@ func _build_hud() -> void:
 	brake.button_up.connect(func(): brake_held = false)
 	var jump := button(hud, "Hop ↑", Rect2(1114,678,138,88), true, 26)
 	jump.pressed.connect(func(): hop_requested.emit())
+	touch_buttons = {"left": left, "right": right, "slow": brake, "hop": jump}
 	label(hud, "← →  STEER    ↑  SLOW    SPACE / A  HOP    +  PAUSE", Rect2(320,739,640,28), 15, MUTED, true, true)
 
 func select_pal(index: int) -> void:
@@ -300,10 +302,9 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 func _touch_action(pos: Vector2) -> String:
-	if Rect2(28,678,88,88).has_point(pos): return "left"
-	if Rect2(128,678,88,88).has_point(pos): return "right"
-	if Rect2(998,688,104,78).has_point(pos): return "slow"
-	if Rect2(1114,678,138,88).has_point(pos): return "hop"
+	# Hit-test the real buttons so layout changes cannot desynchronise touch.
+	for action in touch_buttons:
+		if touch_buttons[action].get_global_rect().has_point(pos): return action
 	return ""
 
 func _update_touch_holds() -> void:

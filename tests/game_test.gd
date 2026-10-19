@@ -45,7 +45,7 @@ func run() -> void:
 	check(not game.ui.menu.visible,"menu hidden during run")
 	# Test steering/braking independently from the separately tested tumble delay.
 	for item in game.items:
-		if item.kind in ["pine","rock"]: item.active = false
+		if item.kind in [game.Kind.PINE,game.Kind.ROCK]: item.active = false
 	step(2)
 	check(game.distance>8,"automatically skis downhill")
 	var x: float = game.skier.position.x
@@ -116,19 +116,19 @@ func run() -> void:
 	check(game.distance>d and not game.ui.modal.visible,"resume continues")
 	# Isolate collisions from the rest of the seeded course.
 	for item in game.items: item.active = false
-	game._add_item("star",game.skier.position+Vector3(0,1,0),1,true)
+	game._add_item(game.Kind.STAR,game.skier.position+Vector3(0,1,0),1,true)
 	var before: int = game.stars
 	game._update_items(.016)
 	game._update_items(.016)
 	check(game.stars==before+1,"star is collected exactly once")
-	game._add_item("rock",game.skier.position,1,true)
+	game._add_item(game.Kind.ROCK,game.skier.position,1,true)
 	game.recovery_time = 0
 	game.jump_time = 0
 	game._update_items(.016)
 	check(game.crash_time>0 and game.state==game.State.CRASHED,"bump starts a seated tumble")
 	step(3.1)
 	check(game.state==game.State.SKIING,"tumble automatically recovers")
-	game._add_item("ramp",game.skier.position,1,true)
+	game._add_item(game.Kind.RAMP,game.skier.position,1,true)
 	game._update_items(.016)
 	check(game.jump_time>0,"ramp auto-hops")
 	game.start_run()

@@ -12,6 +12,8 @@ const CRASH_DURATION := 3.0
 const RESPAWN_GRACE := 1.25
 
 enum State { MENU, SKIING, CRASHED, PAUSED, FINISHED }
+enum Kind { PINE, ROCK, RAMP, STAR, DECORATION }
+const KIND_SCENES := {Kind.PINE: "pine", Kind.ROCK: "rock", Kind.RAMP: "ramp", Kind.STAR: "star"}
 var state := State.MENU
 var selected_pal := 0
 var pace := 0
@@ -45,6 +47,8 @@ var trails: Array[Node3D] = []
 var particles: Array[Dictionary] = []
 var scenes: Dictionary = {}
 var materials: Dictionary = {}
+var box_meshes: Dictionary = {}
+var unit_sphere: SphereMesh
 var sounds: Dictionary = {}
 var music: AudioStreamPlayer
 var sfx: Array[AudioStreamPlayer] = []
@@ -97,19 +101,29 @@ func _mesh(parent: Node3D, mesh: Mesh, pos: Vector3, material: String) -> MeshIn
 	return instance
 
 func _box(parent: Node3D, pos: Vector3, size_: Vector3, material: String) -> MeshInstance3D:
-	var mesh := BoxMesh.new()
-	mesh.size = size_
-	return _mesh(parent,mesh,pos,material)
+	# Ski tracks and particles are spawned constantly; share one mesh per size.
+	if not box_meshes.has(size_):
+		var mesh := BoxMesh.new()
+		mesh.size = size_
+		box_meshes[size_] = mesh
+	return _mesh(parent,box_meshes[size_],pos,material)
 
 func _ball(parent: Node3D, pos: Vector3, scale_: Vector3, material: String) -> MeshInstance3D:
-	var mesh := SphereMesh.new()
-	mesh.radius = 1.0
-	mesh.height = 2.0
-	mesh.radial_segments = 16
-	mesh.rings = 8
-	var instance := _mesh(parent,mesh,pos,material)
+	if unit_sphere == null:
+		unit_sphere = SphereMesh.new()
+		unit_sphere.radius = 1.0
+		unit_sphere.height = 2.0
+		unit_sphere.radial_segments = 16
+		unit_sphere.rings = 8
+	var instance := _mesh(parent,unit_sphere,pos,material)
 	instance.scale = scale_
 	return instance
+
+static func _is_obstacle(kind: Kind) -> bool:
+	return kind == Kind.PINE or kind == Kind.ROCK
+
+func _is_running() -> bool:
+	return state == State.SKIING or state == State.CRASHED
 
 func _asset(kind: String, parent: Node3D, pos: Vector3, size_: float = 1.0) -> Node3D:
 	var instance: Node3D = scenes[kind].instantiate()
@@ -291,14 +305,17 @@ func start_run() -> void:
 		_spawn_row(row_z)
 		row_z += 8
 	_cabin(RUN_LENGTH+8)
+	camera.size = 24
 	_follow_camera()
+	# Looking from the downhill side preserves SkiFree's downhill-on-screen view.
+	camera.look_at(Vector3(0,0,distance+6))
 	ui.show_game()
 	ui.update_run(0,0,RUN_LENGTH)
 	ui.toast("Follow the stars. There’s no hurry!",4.0)
 	_play_sound("start")
 
 func pause_run() -> void:
-	if state not in [State.SKIING,State.CRASHED]: return
+	if not _is_running(): return
 	state = State.PAUSED
 	mouse_steering = false
 	ui.show_modal(false)
@@ -319,10 +336,10 @@ func _input(event: InputEvent) -> void:
 	if not (event is InputEventJoypadButton or event is InputEventJoypadMotion): return
 	# Handle gameplay before the GUI: A always hops, even if a HUD button has focus.
 	if event.is_action_pressed("ski_pause"):
-		if state in [State.SKIING,State.CRASHED]: pause_run()
+		if _is_running(): pause_run()
 		elif state == State.PAUSED: resume_run()
 		get_viewport().set_input_as_handled()
-	elif state in [State.SKIING,State.CRASHED]:
+	elif _is_running():
 		if event.is_action_pressed("ski_hop"): hop()
 		# Stick/D-pad navigation belongs to menus only; gameplay polls these actions.
 		get_viewport().set_input_as_handled()
@@ -330,7 +347,7 @@ func _input(event: InputEvent) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode in [KEY_ESCAPE,KEY_P]:
-			if state in [State.SKIING,State.CRASHED]: pause_run()
+			if _is_running(): pause_run()
 			elif state == State.PAUSED: resume_run()
 		elif event.keycode == KEY_SPACE:
 			hop()
@@ -354,13 +371,13 @@ func _unhandled_input(event: InputEvent) -> void:
 			mouse_steering = true
 
 func _notification(what: int) -> void:
-	if what == NOTIFICATION_APPLICATION_FOCUS_OUT and state in [State.SKIING,State.CRASHED] and capture_mode.is_empty():
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT and _is_running() and capture_mode.is_empty():
 		pause_run()
 
 func _process(delta: float) -> void:
 	# A long frame must not skip collision windows or send a child into a tree.
 	var dt := minf(delta,.05)
-	if state in [State.PAUSED,State.FINISHED]: return
+	if state == State.PAUSED or state == State.FINISHED: return
 	time += dt
 	if state == State.MENU:
 		model.rotation.y = -.16+sin(time*.7)*.12
@@ -386,7 +403,7 @@ func _process(delta: float) -> void:
 	# Youngest setting gently nudges around obstacles, but still permits steering.
 	if pace == 0:
 		for item in items:
-			if item.kind not in ["pine","rock"]: continue
+			if not _is_obstacle(item.kind): continue
 			var ahead: float = item.node.position.z - skier.position.z
 			var side: float = skier.position.x - item.node.position.x
 			if ahead > 0 and ahead < 4.8 and absf(side) < 1.7:
@@ -436,7 +453,7 @@ func _respawn_after_crash() -> void:
 	for attempt in range(items.size()+1):
 		var moved := false
 		for item in items:
-			if item.kind not in ["pine","rock"]: continue
+			if not _is_obstacle(item.kind): continue
 			var obstacle: Node3D = item.node
 			if absf(obstacle.position.x-skier.position.x)<2.2 and absf(obstacle.position.z-respawn_z)<3:
 				respawn_z = obstacle.position.z+3
@@ -457,10 +474,8 @@ func _respawn_after_crash() -> void:
 	_burst(skier.position+Vector3(0,.4,0),"drift",8)
 
 func _follow_camera() -> void:
-	camera.size = 24
-	# Looking from the downhill side preserves SkiFree's downhill-on-screen view.
+	# The view direction never changes during a run; only slide along the slope.
 	camera.position = Vector3(0,27,distance+24)
-	camera.look_at(Vector3(0,0,distance+6))
 	ground.position.z = distance
 
 func _spawn_row(z: float) -> void:
@@ -468,23 +483,24 @@ func _spawn_row(z: float) -> void:
 	for side in [-1,1]:
 		for offset in [0,6]:
 			var x: float = side*course_rng.randf_range(14.0+offset,17.0+offset)
-			_add_item("pine",Vector3(x,0,z+course_rng.randf_range(-3,3)),course_rng.randf_range(.85,1.5),false)
+			_add_item(Kind.PINE,Vector3(x,0,z+course_rng.randf_range(-3,3)),course_rng.randf_range(.85,1.5),false)
 	if z > 12 and z < RUN_LENGTH-12:
 		var row := int(z/8)
-		_add_item("star",Vector3(lane,1.1,z),1,true)
-		_add_item("star",Vector3(sin((z+4)*.035)*6.2,1.1,z+4),1,true)
+		_add_item(Kind.STAR,Vector3(lane,1.1,z),1,true)
+		_add_item(Kind.STAR,Vector3(sin((z+4)*.035)*6.2,1.1,z+4),1,true)
 		if row%3==0:
 			var x := course_rng.randf_range(-10.5,10.5)
 			if absf(x-lane)<3.8: x = clampf(lane+(5.0 if lane<0 else -5.0),-10,10)
-			_add_item("pine" if row%2==0 else "rock",Vector3(x,0,z+2),1,true)
-		if row%9==5: _add_item("ramp",Vector3(lane,0,z+3.2),1,true)
+			_add_item(Kind.PINE if row%2==0 else Kind.ROCK,Vector3(x,0,z+2),1,true)
+		if row%9==5: _add_item(Kind.RAMP,Vector3(lane,0,z+3.2),1,true)
 	# Tiny clusters of snowballs provide depth without blocking the ski path.
 	if int(z)%24==0:
 		var drift := _ball(course,Vector3(-19,-.1,z),Vector3(3,.65,2),"drift")
-		items.append({"node":drift,"kind":"decoration","active":false,"base_y":0.0})
+		items.append({"node":drift,"kind":Kind.DECORATION,"active":false,"base_y":0.0})
 
-func _add_item(kind: String, pos: Vector3, size_: float, active: bool) -> void:
-	var node := _asset(kind,course,pos,size_)
+func _add_item(kind: Kind, pos: Vector3, size_: float, active: bool) -> void:
+	var node := _asset(KIND_SCENES[kind],course,pos,size_)
+	if kind == Kind.STAR: node.rotation.x = -0.85
 	items.append({"node":node,"kind":kind,"active":active,"base_y":pos.y})
 
 func _update_items(dt: float) -> void:
@@ -496,26 +512,28 @@ func _update_items(dt: float) -> void:
 			node.queue_free()
 			items.remove_at(i)
 			continue
-		if item.kind=="star":
-			node.rotation.x = -0.85
+		if item.kind==Kind.STAR:
 			node.rotation.y = sin(time*2+node.position.z)*.5
 			node.position.y = item.base_y+sin(time*3+node.position.z)*.13
 		if not item.active: continue
 		var dz: float = node.position.z-distance
 		var dx: float = node.position.x-skier.position.x
-		if item.kind=="star":
-			var radius := 2.6 if pace==0 else 1.65
-			if Vector2(dx,dz).length()<radius:
-				_collect_star(item)
-			elif pace==0 and absf(dz)<4 and absf(dx)<3.5:
-				node.position.x = move_toward(node.position.x,skier.position.x,dt*2)
-		elif item.kind=="ramp" and absf(dx)<1.5 and absf(dz)<.8:
-			item.active = false
-			if hop(): ui.toast("Wheee!",1.4)
-		elif item.kind in ["pine","rock"] and absf(dx)<1.05 and absf(dz)<1.05 and jump_time<.1 and recovery_time<=0:
-			item.active = false
-			_begin_crash(node)
-			break
+		match item.kind:
+			Kind.STAR:
+				var radius := 2.6 if pace==0 else 1.65
+				if dx*dx+dz*dz<radius*radius:
+					_collect_star(item)
+				elif pace==0 and absf(dz)<4 and absf(dx)<3.5:
+					node.position.x = move_toward(node.position.x,skier.position.x,dt*2)
+			Kind.RAMP:
+				if absf(dx)<1.5 and absf(dz)<.8:
+					item.active = false
+					if hop(): ui.toast("Wheee!",1.4)
+			Kind.PINE, Kind.ROCK:
+				if absf(dx)<1.05 and absf(dz)<1.05 and jump_time<.1 and recovery_time<=0:
+					item.active = false
+					_begin_crash(node)
+					break
 
 func _collect_star(item: Dictionary) -> void:
 	item.active = false
@@ -629,7 +647,7 @@ func _capture() -> void:
 			_process(.016)
 		elif capture_mode.begins_with("crash-"):
 			select_pal(KINDS.find(capture_mode.trim_prefix("crash-")))
-			_add_item("rock",Vector3(0,0,.8),1,true)
+			_add_item(Kind.ROCK,Vector3(0,0,.8),1,true)
 			_update_items(.016)
 	await get_tree().create_timer(1.0).timeout
 	if capture_mode == "game":

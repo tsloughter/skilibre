@@ -41,7 +41,7 @@ func step(seconds: float) -> void:
 
 func clear_obstacles() -> void:
 	for item in game.items:
-		if item.kind in ["pine","rock"]: item.active = false
+		if item.kind in [game.Kind.PINE,game.Kind.ROCK]: item.active = false
 
 func run() -> void:
 	game = load("res://main.tscn").instantiate()

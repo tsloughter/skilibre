@@ -29,7 +29,7 @@ func run() -> void:
 	await process_frame
 	game.set_process(false)
 	for pal in range(4):
-		for kind in ["pine","rock"]:
+		for kind in [game.Kind.PINE,game.Kind.ROCK]:
 			prepare(pal)
 			await process_frame
 			game._add_item(kind,Vector3(0,0,.8),1,true)
@@ -76,16 +76,16 @@ func run() -> void:
 	# Adjacent obstacles must not occupy the chosen respawn spot.
 	prepare(0)
 	await process_frame
-	game._add_item("rock",Vector3(0,0,.5),1,true)
-	game._add_item("pine",Vector3(0,0,4),1,true)
+	game._add_item(game.Kind.ROCK,Vector3(0,0,.5),1,true)
+	game._add_item(game.Kind.PINE,Vector3(0,0,4),1,true)
 	game._update_items(.016)
 	step(3.1)
 	check(game.distance>=7,"respawn clears an adjacent obstacle too")
-	game._add_item("rock",game.skier.position,1,true)
+	game._add_item(game.Kind.ROCK,game.skier.position,1,true)
 	game._update_items(.016)
 	check(game.state==game.State.SKIING,"brief recovery grace prevents immediate repeated crash")
 	step(1.3)
-	game._add_item("rock",game.skier.position,1,true)
+	game._add_item(game.Kind.ROCK,game.skier.position,1,true)
 	game._update_items(.016)
 	check(game.state==game.State.CRASHED,"later collisions still trigger tumbles")
 	game.go_home()
@@ -94,7 +94,7 @@ func run() -> void:
 	await process_frame
 	game.hop()
 	step(.4)
-	game._add_item("rock",game.skier.position,1,true)
+	game._add_item(game.Kind.ROCK,game.skier.position,1,true)
 	game._update_items(.016)
 	check(game.state==game.State.SKIING,"hopping clears an obstacle without tumbling")
 	game.jump_time = 0

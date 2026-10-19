@@ -43,6 +43,12 @@ var message_time := 0.0
 var touch_actions: Dictionary = {}
 var touch_buttons: Dictionary = {}
 var licenses_dialog: AcceptDialog
+var modal_icon: Label
+var modal_title: Label
+var modal_subtitle: Label
+var modal_detail: Label
+var modal_primary: Button
+var modal_finished := false
 
 func _ready() -> void:
 	BOLD.set_fallbacks([SYMBOLS])
@@ -55,6 +61,7 @@ func _ready() -> void:
 	modal.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	modal.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(modal)
+	_build_modal()
 	mute_button = button(self, "Sound on", Rect2(1126, 28, 126, 44), false, 16)
 	mute_button.pressed.connect(func(): sound_requested.emit())
 	hud.hide()
@@ -187,7 +194,8 @@ func _add_portrait(parent: Control, kind: String) -> void:
 	viewport.size = Vector2i(224,230)
 	viewport.transparent_bg = true
 	viewport.own_world_3d = true
-	viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	# The portrait never moves, so one render per menu visit is enough.
+	viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 	parent.add_child(viewport)
 	portraits.append(viewport)
 	var model: Node3D = load("res://assets/models/%s.glb" % kind).instantiate()
@@ -265,7 +273,7 @@ func show_menu() -> void:
 	hud.hide()
 	modal.hide()
 	_clear_holds()
-	for v in portraits: v.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	for v in portraits: v.render_target_update_mode = SubViewport.UPDATE_ONCE
 	play_button.grab_focus()
 
 func show_game() -> void:
@@ -327,26 +335,33 @@ func _process(delta: float) -> void:
 	message_time = maxf(0,message_time-delta)
 	if message_time <= 0: message_label.modulate.a = move_toward(message_label.modulate.a,0,delta)
 
-func show_modal(finished: bool, stars: int = 0) -> void:
-	for child in modal.get_children(): child.queue_free()
-	_clear_holds()
-	modal.show()
+func _build_modal() -> void:
 	var shade := ColorRect.new()
 	shade.color = Color(0.13,0.28,0.31,0.3)
 	shade.size = Vector2(1280,800)
 	modal.add_child(shade)
 	panel(modal, Rect2(340,155,600,490), CREAM, 32)
-	label(modal, "★   ★   ★" if finished else "Ⅱ", Rect2(400,188,480,72), 48, Color("d6a348"), true, true)
-	label(modal, "You did it!" if finished else "A little breather", Rect2(380,280,520,65), 44, INK, true, true)
-	label(modal, "Warm cocoa for everyone." if finished else "Your mountain will be right here.", Rect2(380,350,520,34), 22, MUTED, false, true)
-	label(modal, "%d stars collected · So many happy turns!" % stars if finished else "Ready for a few more happy turns?", Rect2(380,396,520,30), 18, TEAL, false, true)
-	var primary := button(modal, "Ski again!   →" if finished else "Keep skiing   →", Rect2(400,461,480,64), true, 26)
-	primary.pressed.connect(func():
-		if finished: play_requested.emit()
+	modal_icon = label(modal, "", Rect2(400,188,480,72), 48, Color("d6a348"), true, true)
+	modal_title = label(modal, "", Rect2(380,280,520,65), 44, INK, true, true)
+	modal_subtitle = label(modal, "", Rect2(380,350,520,34), 22, MUTED, false, true)
+	modal_detail = label(modal, "", Rect2(380,396,520,30), 18, TEAL, false, true)
+	modal_primary = button(modal, "", Rect2(400,461,480,64), true, 26)
+	modal_primary.pressed.connect(func():
+		if modal_finished: play_requested.emit()
 		else: resume_requested.emit())
 	var home := button(modal, "Choose another pal", Rect2(400,544,480,54), false, 20)
 	home.pressed.connect(func(): home_requested.emit())
-	primary.grab_focus()
+
+func show_modal(finished: bool, stars: int = 0) -> void:
+	_clear_holds()
+	modal_finished = finished
+	modal_icon.text = "★   ★   ★" if finished else "Ⅱ"
+	modal_title.text = "You did it!" if finished else "A little breather"
+	modal_subtitle.text = "Warm cocoa for everyone." if finished else "Your mountain will be right here."
+	modal_detail.text = "%d stars collected · So many happy turns!" % stars if finished else "Ready for a few more happy turns?"
+	modal_primary.text = "Ski again!   →" if finished else "Keep skiing   →"
+	modal.show()
+	modal_primary.grab_focus()
 
 func set_muted(muted: bool) -> void:
 	mute_button.text = "Sound off" if muted else "Sound on"

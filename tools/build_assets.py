@@ -6,7 +6,7 @@ import bpy
 import bmesh
 import math
 from pathlib import Path
-from mathutils import Vector
+from mathutils import Matrix, Vector
 
 ROOT = Path(__file__).resolve().parents[1]
 bpy.ops.object.select_all(action='SELECT')
@@ -43,11 +43,27 @@ def finish(obj, name, material):
     obj.data.materials.append(M[material])
     return obj
 
+SPHERES = {}
+
 def sphere(name, loc, scale, material):
-    bpy.ops.mesh.primitive_uv_sphere_add(segments=20, ring_count=12, location=loc)
-    o=finish(bpy.context.object, name, material)
-    o.scale=scale
-    for p in o.data.polygons: p.use_smooth=True
+    """All spheres share one of two mesh datablocks; size and colour live on the
+    object, so a character adds objects, not geometry, to the file."""
+    segments = (20, 12) if max(scale) >= .12 else (12, 8)
+    if segments not in SPHERES:
+        bpy.ops.mesh.primitive_uv_sphere_add(segments=segments[0], ring_count=segments[1])
+        tmp = bpy.context.object
+        mesh = tmp.data
+        mesh.name = 'Sphere %dx%d' % segments
+        for p in mesh.polygons: p.use_smooth = True
+        mesh.materials.append(None)
+        bpy.data.objects.remove(tmp)
+        SPHERES[segments] = mesh
+    o = bpy.data.objects.new(name, SPHERES[segments])
+    current.objects.link(o)
+    o.location = loc
+    o.scale = scale
+    o.material_slots[0].link = 'OBJECT'
+    o.material_slots[0].material = M[material]
     return o
 
 def box(name, loc, scale, material, bevel=.1):
@@ -85,12 +101,75 @@ def start(name):
     global current
     current=bpy.data.collections.new(name); bpy.context.scene.collection.children.link(current)
 
-def export(name):
+HEAD_PARTS = ['Head', 'Bright eye', 'Eye sparkle', 'Button nose', 'Smile', 'Rosy cheek',
+    'Fluffy cheek', 'Pointy ear', 'Inner ear', 'Long bunny ear', 'Pink ear', 'Round ear',
+    'Ear center', 'Muzzle', 'White face', 'Beak', 'Hat', 'Pom pom']
+SKI_PARTS = ['Candy-colored ski', 'Upturned ski tip', 'Boot']
+POLE_PARTS = ['Ski pole', 'Pole basket']
+# The object whose origin and material come first in each baked group. Godot's
+# pose rig reads the ski side from the origin and the fur from Body surface 0.
+ANCHORS = {'Head': 'Head', 'Body': 'Round tummy', 'Left ski': 'Candy-colored ski',
+    'Right ski': 'Candy-colored ski', 'Left pole': 'Ski pole', 'Right pole': 'Ski pole'}
+
+def pose_group(o):
+    """Which baked part of a character an object belongs to."""
+    base = o.name.split('.')[0]
+    side = 'Left' if o.location.x < 0 else 'Right'
+    if base in HEAD_PARTS: return 'Head'
+    if base in SKI_PARTS: return f'{side} ski'
+    if base in POLE_PARTS: return f'{side} pole'
+    return 'Body'
+
+def bake(objects, name):
+    """Merge evaluated meshes (modifiers applied, curves converted) into one
+    object with one material slot per colour, keeping the anchor's origin."""
+    deps = bpy.context.evaluated_depsgraph_get()
+    anchor = next((o for o in objects if o.name.split('.')[0] == ANCHORS.get(name)), objects[0])
+    origin = anchor.matrix_world.translation.copy()
+    bm = bmesh.new()
+    materials = [anchor.material_slots[0].material]
+    for o in objects:
+        ev = o.evaluated_get(deps)
+        me = ev.to_mesh()
+        me.transform(o.matrix_world)
+        me.transform(Matrix.Translation(-origin))
+        remap = []
+        for slot in o.material_slots:
+            if slot.material not in materials: materials.append(slot.material)
+            remap.append(materials.index(slot.material))
+        before = len(bm.faces)
+        bm.from_mesh(me)
+        bm.faces.ensure_lookup_table()
+        for f in bm.faces[before:]: f.material_index = remap[f.material_index] if remap else 0
+        ev.to_mesh_clear()
+    mesh = bpy.data.meshes.new(name)
+    bm.to_mesh(mesh); bm.free()
+    for m in materials: mesh.materials.append(m)
+    baked = bpy.data.objects.new(name, mesh)
+    baked.location = origin
+    return baked
+
+def export(name, grouped=False):
+    """Write the asset as a handful of merged nodes; the .blend keeps the
+    editable parts and modifiers."""
+    groups = {}
+    for o in current.objects:
+        groups.setdefault(pose_group(o) if grouped else name.capitalize(), []).append(o)
+    staging = bpy.data.collections.new(f'{name} export')
+    bpy.context.scene.collection.children.link(staging)
+    baked = [bake(objs, group) for group, objs in groups.items()]
+    for o in baked: staging.objects.link(o)
     bpy.ops.object.select_all(action='DESELECT')
-    for o in current.objects: o.select_set(True)
-    bpy.context.view_layer.objects.active=next(iter(current.objects))
+    for o in baked: o.select_set(True)
+    bpy.context.view_layer.objects.active = baked[0]
     bpy.ops.export_scene.gltf(filepath=str(ROOT/'assets/models'/f'{name}.glb'),
-        export_format='GLB', use_selection=True, export_apply=True, export_animations=False)
+        export_format='GLB', use_selection=True, export_animations=False,
+        export_texcoords=False, export_apply=True)
+    for o in baked:
+        mesh = o.data
+        bpy.data.objects.remove(o)
+        bpy.data.meshes.remove(mesh)
+    bpy.data.collections.remove(staging)
 
 def animal(kind):
     start(kind)
@@ -142,7 +221,7 @@ def animal(kind):
     knit=finish(bpy.context.object,'Cozy scarf',scarf)
     for p in knit.data.polygons: p.use_smooth=True
     tail=box('Scarf tail',(.36,.35,1.26),(.22,.14,.63),scarf,.06); tail.rotation_euler[1]=-.3
-    export(kind)
+    export(kind, grouped=True)
 
 for kind in ['fox','bunny','bear','penguin']: animal(kind)
 

@@ -47,7 +47,7 @@ func run() -> void:
 				if part.category=="head":
 					head_part = part
 					head_count += 1
-			check(head_count>=10,"face and ears are included in head pose")
+			check(head_count==1 and head_part.node.mesh.get_surface_count()>=3,"face and ears are baked into the one head part")
 			check(not head_part.node.transform.is_equal_approx(head_part.rest),"head is posed independently")
 			var head_before: Transform3D = head_part.node.transform
 			var star_before: Vector3 = game.pose.orbit_stars[0].position

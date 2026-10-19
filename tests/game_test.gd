@@ -36,7 +36,7 @@ func run() -> void:
 	for i in range(4):
 		game.ui.cards[i].pressed.emit()
 		check(game.selected_pal==i,"character selection signal %d" % i)
-		check(game.model.get_child_count()>10,"Blender animal mesh imported %d" % i)
+		check(game.pose.parts.size()==6,"Blender animal imported as six posable parts %d" % i)
 	game.select_pal(0)
 	game.ui.paces[1].pressed.emit()
 	check(game.pace==1,"pace button selects explorer")

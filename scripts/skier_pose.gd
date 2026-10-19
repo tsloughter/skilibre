@@ -1,10 +1,9 @@
 class_name SkierPose
 extends RefCounted
-## Pose the named pieces of the original Blender models without changing the
-## shared meshes. Facial details rotate together around the base of the head.
-const HEAD_PARTS = ["Head", "Bright eye", "Eye sparkle", "Button nose", "Smile",
-	"Rosy cheek", "Fluffy cheek", "Pointy ear", "Inner ear", "Long bunny ear",
-	"Pink ear", "Round ear", "Ear center", "Muzzle", "White face", "Beak", "Hat", "Pom pom"]
+## Pose the baked parts of the original Blender models without changing the
+## shared meshes. tools/build_assets.py exports each character as Head, Body,
+## Left/Right ski and Left/Right pole; the face rotates with the head around
+## the base of the neck.
 var parts: Array[Dictionary] = []
 var legs: Array[MeshInstance3D] = []
 var halo: Node3D
@@ -15,15 +14,13 @@ func setup(model: Node3D, star_scene: PackedScene, kind: String) -> void:
 	var fur: Material
 	for child in model.get_children():
 		if not child is Node3D: continue
-		var category := "body"
 		var part_name := String(child.name)
-		for prefix in HEAD_PARTS:
-			if part_name.begins_with(prefix): category = "head"
-		if part_name.begins_with("Boot") or part_name.begins_with("Candy-colored ski") or part_name.begins_with("Upturned ski tip"):
-			category = "ski"
-		if part_name.begins_with("Ski pole") or part_name.begins_with("Pole basket"):
-			category = "pole"
-		if part_name.begins_with("Round tummy") and child is MeshInstance3D:
+		var category := "body"
+		if part_name.begins_with("Head"): category = "head"
+		elif part_name.ends_with("ski"): category = "ski"
+		elif part_name.ends_with("pole"): category = "pole"
+		# The exporter puts the tummy's fur first among the body's surfaces.
+		if category == "body" and child is MeshInstance3D:
 			fur = child.mesh.surface_get_material(0)
 		parts.append({"node":child,"rest":child.transform,"category":category})
 	for side in [-1,1]:

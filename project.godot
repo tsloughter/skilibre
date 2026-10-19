@@ -63,6 +63,14 @@ ski_pause={
 "deadzone": 0.25,
 "events": [Object(InputEventKey,"keycode":4194305), Object(InputEventKey,"keycode":80), Object(InputEventJoypadButton,"device":-1,"button_index":6)]
 }
+ski_sound={
+"deadzone": 0.25,
+"events": [Object(InputEventKey,"keycode":77)]
+}
+ski_fullscreen={
+"deadzone": 0.25,
+"events": [Object(InputEventKey,"keycode":4194342)]
+}
 
 [input_devices]
 pointing/emulate_mouse_from_touch=true

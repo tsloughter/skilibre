@@ -32,13 +32,16 @@ func press(code: int) -> void:
 		root.push_input(event,true)
 		await process_frame
 
+func center(c: Control) -> Vector2:
+	return c.get_global_rect().get_center()
+
 func run() -> void:
 	game = load("res://main.tscn").instantiate()
 	root.add_child(game)
 	current_scene = game
 	await process_frame
 	game.set_process(false)
-	await click(Vector2(1180,764))
+	await click(center(game.ui.licenses_button))
 	check(game.ui.licenses_dialog.visible,"licenses button opens the license dialog")
 	var license_tabs: TabContainer
 	for child in game.ui.licenses_dialog.get_children():
@@ -51,25 +54,25 @@ func run() -> void:
 	await press(KEY_ESCAPE)
 	check(not game.ui.licenses_dialog.visible,"Escape closes the license dialog")
 	check(root.gui_get_focus_owner()==game.ui.play_button,"closing licenses restores keyboard start focus")
-	await click(Vector2(240,340))
+	await click(center(game.ui.cards[1]))
 	check(game.selected_pal==1,"portrait hit target chooses Clover")
-	await click(Vector2(420,525))
+	await click(center(game.ui.paces[1]))
 	check(game.pace==1,"pace hit target chooses Little explorer")
-	await click(Vector2(300,620))
+	await click(center(game.ui.play_button))
 	check(game.state==game.State.SKIING,"play hit target starts game")
 	await press(KEY_P)
 	check(game.state==game.State.PAUSED,"P pauses through input routing")
 	await press(KEY_ENTER)
 	check(game.state==game.State.SKIING,"Enter activates focused resume button")
-	await click(Vector2(1080,56))
+	await click(center(game.ui.pause_button))
 	check(game.state==game.State.PAUSED,"pause button hit target works")
-	await click(Vector2(600,570))
+	await click(center(game.ui.home_button))
 	check(game.state==game.State.MENU,"home button returns to selection")
 	await press(KEY_ENTER)
 	check(game.state==game.State.SKIING,"keyboard-only start works")
 	var touch := InputEventScreenTouch.new()
 	touch.index = 0
-	touch.position = Vector2(60,720)
+	touch.position = center(game.ui.touch_buttons["left"])
 	touch.pressed = true
 	root.push_input(touch,true)
 	await process_frame
@@ -78,7 +81,7 @@ func run() -> void:
 	root.push_input(touch,true)
 	await process_frame
 	check(not game.ui.left_held,"touch release stops steering")
-	check(game.ui.mute_button.get_rect().end.x<=1280,"sound button fits design canvas")
+	check(game.ui.mute_button.get_global_rect().end.x<=1280,"sound button fits design canvas")
 	print("SNOW PALS UI: %d checks, %d failures" % [checks,failures])
 	game.queue_free()
 	await process_frame

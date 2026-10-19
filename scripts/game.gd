@@ -2,9 +2,6 @@ extends Node3D
 ## Downhill is world +Z and screen down. The camera never rotates with the skier.
 ## Course coordinates stay local to the start; each short run resets the course.
 
-const UI = preload("res://scripts/interface.gd")
-const SkierPose = preload("res://scripts/skier_pose.gd")
-const KINDS = ["fox", "bunny", "bear", "penguin"]
 const RUN_LENGTH := 360.0
 const EDGE := 11.8
 const SETTINGS_PATH := "user://snow_pals.cfg"
@@ -13,7 +10,27 @@ const RESPAWN_GRACE := 1.25
 
 enum State { MENU, SKIING, CRASHED, PAUSED, FINISHED }
 enum Kind { PINE, ROCK, RAMP, STAR, DECORATION }
-const KIND_SCENES := {Kind.PINE: "pine", Kind.ROCK: "rock", Kind.RAMP: "ramp", Kind.STAR: "star"}
+const KIND_SCENES: Dictionary[Kind, String] = {Kind.PINE: "pine", Kind.ROCK: "rock", Kind.RAMP: "ramp", Kind.STAR: "star"}
+
+class Item:
+	var node: Node3D
+	var kind: Kind
+	var active: bool
+	var base_y: float
+	func _init(node_: Node3D, kind_: Kind, active_: bool, base_y_: float) -> void:
+		node = node_
+		kind = kind_
+		active = active_
+		base_y = base_y_
+
+class Particle:
+	var node: Node3D
+	var life := .7
+	var velocity: Vector3
+	func _init(node_: Node3D, velocity_: Vector3) -> void:
+		node = node_
+		velocity = velocity_
+
 var state := State.MENU
 var selected_pal := 0
 var pace := 0
@@ -41,18 +58,18 @@ var ground: MeshInstance3D
 var menu_world: Node3D
 var course: Node3D
 var trail_root: Node3D
-var ui: UI
-var items: Array[Dictionary] = []
+var ui: SnowPalsUI
+var items: Array[Item] = []
 var trails: Array[Node3D] = []
-var particles: Array[Dictionary] = []
-var scenes: Dictionary = {}
-var materials: Dictionary = {}
-var box_meshes: Dictionary = {}
+var particles: Array[Particle] = []
+var scenes: Dictionary[String, PackedScene] = {}
+var materials: Dictionary[String, StandardMaterial3D] = {}
+var box_meshes: Dictionary[Vector3, BoxMesh] = {}
 var unit_sphere: SphereMesh
-var sounds: Dictionary = {}
+var flag_mesh: ArrayMesh
+var sounds: Dictionary[String, AudioStream] = {}
 var music: AudioStreamPlayer
-var sfx: Array[AudioStreamPlayer] = []
-var sfx_index := 0
+var sfx: AudioStreamPlayer
 var settings_enabled := true
 var capture_mode := ""
 
@@ -61,14 +78,14 @@ func _ready() -> void:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--capture="): capture_mode = arg.trim_prefix("--capture=")
 	if settings_enabled: _load_settings()
-	for kind in KINDS + ["pine", "rock", "ramp", "star"]:
+	for kind in Pals.KINDS + ["pine", "rock", "ramp", "star"]:
 		scenes[kind] = load("res://assets/models/%s.glb" % kind)
 	_make_materials()
 	_build_world()
 	_build_audio()
 	var canvas := CanvasLayer.new()
 	add_child(canvas)
-	ui = UI.new()
+	ui = SnowPalsUI.new()
 	canvas.add_child(ui)
 	ui.pal_selected.connect(select_pal)
 	ui.pace_selected.connect(select_pace)
@@ -81,7 +98,7 @@ func _ready() -> void:
 	ui.select_pal(selected_pal)
 	ui.select_pace(pace)
 	ui.set_muted(muted)
-	AudioServer.set_bus_mute(0, muted)
+	AudioServer.set_bus_mute(AudioServer.get_bus_index(&"Master"), muted)
 	go_home()
 	if not capture_mode.is_empty(): _capture()
 
@@ -191,18 +208,21 @@ func _bunting(parent: Node3D, pos: Vector3, width: float) -> void:
 		_box(parent,pos+Vector3(x,1.6,0),Vector3(.09,3.2,.09),"wood")
 		_ball(parent,pos+Vector3(x,3.22,0),Vector3.ONE*.13,"cream")
 	_box(parent,pos+Vector3(0,2.9,0),Vector3(width,.035,.035),"cream")
+	if flag_mesh == null:
+		# A static triangle; ImmediateMesh is meant for geometry rebuilt every frame.
+		var arrays := []
+		arrays.resize(Mesh.ARRAY_MAX)
+		arrays[Mesh.ARRAY_VERTEX] = PackedVector3Array([Vector3(-.24,0,0),Vector3(0,-.48,0),Vector3(.24,0,0)])
+		arrays[Mesh.ARRAY_NORMAL] = PackedVector3Array([Vector3.BACK,Vector3.BACK,Vector3.BACK])
+		flag_mesh = ArrayMesh.new()
+		flag_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arrays)
+		for tint in ["coral","gold","teal"]:
+			var m: StandardMaterial3D = materials[tint].duplicate()
+			m.cull_mode = BaseMaterial3D.CULL_DISABLED
+			materials["flag_"+tint] = m
 	for i in range(9):
 		var x := -width/2+.5+i*(width-1)/8
-		var mesh := ImmediateMesh.new()
-		mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
-		mesh.surface_add_vertex(Vector3(-.24,0,0))
-		mesh.surface_add_vertex(Vector3(0,-.48,0))
-		mesh.surface_add_vertex(Vector3(.24,0,0))
-		mesh.surface_end()
-		var m: StandardMaterial3D = materials[["coral","gold","teal"][i%3]].duplicate()
-		m.cull_mode = BaseMaterial3D.CULL_DISABLED
-		var flag := _mesh(parent,mesh,pos+Vector3(x,2.88,0),"coral")
-		flag.material_override = m
+		_mesh(parent,flag_mesh,pos+Vector3(x,2.88,0),"flag_"+["coral","gold","teal"][i%3])
 
 func _cabin(z: float) -> void:
 	var root := Node3D.new()
@@ -221,7 +241,7 @@ func _cabin(z: float) -> void:
 		_box(root,Vector3(side*1.4,1.5,2),Vector3(.8,.045,.03),"wood")
 	var sign_label := Label3D.new()
 	sign_label.text = "COCOA"
-	sign_label.font = UI.BOLD
+	sign_label.font = SnowPalsUI.BOLD
 	sign_label.font_size = 48
 	sign_label.pixel_size = .009
 	sign_label.position = Vector3(0,2.45,1.95)
@@ -231,12 +251,10 @@ func _cabin(z: float) -> void:
 	_bunting(course,Vector3(0,0,z-4),10.0)
 
 func _replace_pal() -> void:
-	if is_instance_valid(model):
-		skier.remove_child(model)
-		model.queue_free()
-	model = _asset(KINDS[selected_pal],skier,Vector3.ZERO)
+	if is_instance_valid(model): model.queue_free()
+	model = _asset(Pals.KINDS[selected_pal],skier,Vector3.ZERO)
 	pose = SkierPose.new()
-	pose.setup(model,scenes["star"],KINDS[selected_pal])
+	pose.setup(model,scenes["star"],Pals.KINDS[selected_pal])
 
 func _reset_crash() -> void:
 	crash_time = 0
@@ -246,7 +264,7 @@ func _reset_crash() -> void:
 	pose.reset()
 	model.position = Vector3.ZERO
 	model.rotation = Vector3.ZERO
-	ui.message_label.position.y = 118
+	ui.set_message_low(false)
 
 func select_pal(index: int) -> void:
 	selected_pal = clampi(index,0,3)
@@ -332,43 +350,31 @@ func hop() -> bool:
 	_play_sound("hop")
 	return true
 
-func _input(event: InputEvent) -> void:
-	if not (event is InputEventJoypadButton or event is InputEventJoypadMotion): return
-	# Handle gameplay before the GUI: A always hops, even if a HUD button has focus.
+func _unhandled_input(event: InputEvent) -> void:
+	# Keyboard and controller share the same actions. Menus and the pause modal
+	# consume ui_accept first; gameplay buttons cannot take focus, so during a
+	# run Space and A always arrive here. Steering actions are polled in _process.
 	if event.is_action_pressed("ski_pause"):
 		if _is_running(): pause_run()
 		elif state == State.PAUSED: resume_run()
-		get_viewport().set_input_as_handled()
-	elif _is_running():
-		if event.is_action_pressed("ski_hop"): hop()
-		# Stick/D-pad navigation belongs to menus only; gameplay polls these actions.
-		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("ski_hop"):
+		hop()
+	elif event.is_action_pressed("ski_sound"):
+		toggle_sound()
+	elif event.is_action_pressed("ski_fullscreen"):
+		var window := get_window()
+		window.mode = Window.MODE_WINDOWED if window.mode == Window.MODE_FULLSCREEN else Window.MODE_FULLSCREEN
+	if state == State.SKIING: _steer_from_pointer(event)
 
-func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventKey and event.pressed and not event.echo:
-		if event.keycode in [KEY_ESCAPE,KEY_P]:
-			if _is_running(): pause_run()
-			elif state == State.PAUSED: resume_run()
-		elif event.keycode == KEY_SPACE:
-			hop()
-		elif event.keycode == KEY_M: toggle_sound()
-		elif event.keycode == KEY_F11:
-			var full := DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
-			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED if full else DisplayServer.WINDOW_MODE_FULLSCREEN)
-		if event.keycode in [KEY_LEFT,KEY_RIGHT,KEY_A,KEY_D,KEY_UP,KEY_DOWN]: mouse_steering = false
-	if state != State.SKIING: return
-	if event is InputEventMouseMotion and event.relative.length() > 1.5:
-		if event.position.y > 110 and event.position.y < 675:
-			var origin := camera.project_ray_origin(event.position)
-			var ray := camera.project_ray_normal(event.position)
-			mouse_target = clampf((origin+ray*(-origin.y/ray.y)).x,-EDGE,EDGE)
-			mouse_steering = true
-	if event is InputEventScreenDrag or event is InputEventScreenTouch:
-		if event.position.y > 110 and event.position.y < 675:
-			var origin := camera.project_ray_origin(event.position)
-			var ray := camera.project_ray_normal(event.position)
-			mouse_target = clampf((origin+ray*(-origin.y/ray.y)).x,-EDGE,EDGE)
-			mouse_steering = true
+func _steer_from_pointer(event: InputEvent) -> void:
+	var moving: bool = event is InputEventMouseMotion and event.relative.length() > 1.5
+	if not (moving or event is InputEventScreenDrag or event is InputEventScreenTouch): return
+	# Only the slope between the HUD bar and the touch buttons steers.
+	if event.position.y <= 110 or event.position.y >= 675: return
+	var origin := camera.project_ray_origin(event.position)
+	var ray := camera.project_ray_normal(event.position)
+	mouse_target = clampf((origin+ray*(-origin.y/ray.y)).x,-EDGE,EDGE)
+	mouse_steering = true
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT and _is_running() and capture_mode.is_empty():
@@ -394,10 +400,7 @@ func _process(delta: float) -> void:
 		if crash_time <= 0: _respawn_after_crash()
 		return
 	recovery_time = maxf(0,recovery_time-dt)
-	var axis := Input.get_axis("ski_left", "ski_right")
-	if ui.left_held: axis -= 1
-	if ui.right_held: axis += 1
-	axis = clampf(axis,-1,1)
+	var axis := clampf(Input.get_axis("ski_left", "ski_right") + ui.get_steer_axis(),-1,1)
 	if axis != 0: mouse_steering = false
 	if mouse_steering: axis = clampf((mouse_target-skier.position.x)*.7,-1,1)
 	# Youngest setting gently nudges around obstacles, but still permits steering.
@@ -408,7 +411,7 @@ func _process(delta: float) -> void:
 			var side: float = skier.position.x - item.node.position.x
 			if ahead > 0 and ahead < 4.8 and absf(side) < 1.7:
 				axis = clampf(axis + (1.0 if side >= 0 else -1.0)*(1.0-ahead/4.8)*.85,-1,1)
-	var braking: bool = Input.is_action_pressed("ski_slow") or ui.brake_held
+	var braking := Input.is_action_pressed("ski_slow") or ui.is_braking()
 	var target_speed := 5.3 if pace==0 else 8.0
 	if Input.is_action_pressed("ski_fast"): target_speed *= 1.18
 	if braking: target_speed = 0.0
@@ -444,7 +447,7 @@ func _begin_crash(obstacle: Node3D) -> void:
 	model.rotation = Vector3.ZERO
 	pose.sit(0,0)
 	_burst(skier.position+Vector3(0,.5,0),"drift",10)
-	ui.message_label.position.y = 588
+	ui.set_message_low(true)
 	ui.toast("A little tumble! Back up in a moment.",CRASH_DURATION)
 	_play_sound("bump")
 
@@ -469,7 +472,7 @@ func _respawn_after_crash() -> void:
 	state = State.SKIING
 	_follow_camera()
 	ui.update_run(distance,stars,RUN_LENGTH)
-	ui.message_label.position.y = 118
+	ui.set_message_low(false)
 	ui.toast("Back on our skis!",1.5)
 	_burst(skier.position+Vector3(0,.4,0),"drift",8)
 
@@ -496,12 +499,12 @@ func _spawn_row(z: float) -> void:
 	# Tiny clusters of snowballs provide depth without blocking the ski path.
 	if int(z)%24==0:
 		var drift := _ball(course,Vector3(-19,-.1,z),Vector3(3,.65,2),"drift")
-		items.append({"node":drift,"kind":Kind.DECORATION,"active":false,"base_y":0.0})
+		items.append(Item.new(drift,Kind.DECORATION,false,0.0))
 
 func _add_item(kind: Kind, pos: Vector3, size_: float, active: bool) -> void:
 	var node := _asset(KIND_SCENES[kind],course,pos,size_)
 	if kind == Kind.STAR: node.rotation.x = -0.85
-	items.append({"node":node,"kind":kind,"active":active,"base_y":pos.y})
+	items.append(Item.new(node,kind,active,pos.y))
 
 func _update_items(dt: float) -> void:
 	if state != State.SKIING: return
@@ -535,7 +538,7 @@ func _update_items(dt: float) -> void:
 					_begin_crash(node)
 					break
 
-func _collect_star(item: Dictionary) -> void:
+func _collect_star(item: Item) -> void:
 	item.active = false
 	item.node.hide()
 	stars += 1
@@ -558,7 +561,7 @@ func _burst(pos: Vector3, material: String, count: int) -> void:
 	for i in range(count):
 		var p := _ball(trail_root,pos,Vector3.ONE*.12,material)
 		# Global RNG keeps the seeded course layout identical from run to run.
-		particles.append({"node":p,"life":.7,"velocity":Vector3(randf_range(-2,2),randf_range(1,3),randf_range(-2,2))})
+		particles.append(Particle.new(p,Vector3(randf_range(-2,2),randf_range(1,3),randf_range(-2,2))))
 
 func _update_particles(dt: float) -> void:
 	for i in range(particles.size()-1,-1,-1):
@@ -579,15 +582,16 @@ func _finish_run() -> void:
 func _build_audio() -> void:
 	for sound in ["pick","hop","star","bump","start","finish"]:
 		sounds[sound] = load("res://assets/audio/%s.wav" % sound)
-	for i in range(6):
-		var player := AudioStreamPlayer.new()
-		player.volume_db = -13
-		add_child(player)
-		sfx.append(player)
+	# One player mixes up to six overlapping effects; the stream never ends.
+	sfx = AudioStreamPlayer.new()
+	var polyphonic := AudioStreamPolyphonic.new()
+	polyphonic.polyphony = 6
+	sfx.stream = polyphonic
+	sfx.volume_db = -13
+	add_child(sfx)
+	sfx.play()
 	music = AudioStreamPlayer.new()
-	music.stream = load("res://assets/audio/snow_day.wav")
-	music.stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
-	music.stream.loop_end = int(music.stream.get_length()*music.stream.mix_rate)
+	music.stream = load("res://assets/audio/snow_day.wav") # Looping is set in the import settings.
 	music.volume_db = -23
 	add_child(music)
 	music.play()
@@ -596,24 +600,19 @@ func _exit_tree() -> void:
 	_stop_audio()
 
 func _stop_audio() -> void:
-	if is_instance_valid(music):
-		music.stop()
-		music.stream = null
-	for player in sfx:
+	for player in [music, sfx]:
 		if is_instance_valid(player):
 			player.stop()
 			player.stream = null
 
 func _play_sound(key: String) -> void:
-	if sfx.is_empty(): return
-	var player := sfx[sfx_index%sfx.size()]
-	sfx_index += 1
-	player.stream = sounds[key]
-	player.play()
+	if not is_instance_valid(sfx): return
+	var playback := sfx.get_stream_playback() as AudioStreamPlaybackPolyphonic
+	if playback: playback.play_stream(sounds[key])
 
 func toggle_sound() -> void:
 	muted = not muted
-	AudioServer.set_bus_mute(0,muted)
+	AudioServer.set_bus_mute(AudioServer.get_bus_index(&"Master"),muted)
 	ui.set_muted(muted)
 	_save_settings()
 
@@ -646,7 +645,7 @@ func _capture() -> void:
 			distance = RUN_LENGTH
 			_process(.016)
 		elif capture_mode.begins_with("crash-"):
-			select_pal(KINDS.find(capture_mode.trim_prefix("crash-")))
+			select_pal(Pals.KINDS.find(capture_mode.trim_prefix("crash-")))
 			_add_item(Kind.ROCK,Vector3(0,0,.8),1,true)
 			_update_items(.016)
 	await get_tree().create_timer(1.0).timeout

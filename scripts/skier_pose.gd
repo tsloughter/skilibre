@@ -1,3 +1,4 @@
+class_name SkierPose
 extends RefCounted
 ## Pose the named pieces of the original Blender models without changing the
 ## shared meshes. Facial details rotate together around the base of the head.

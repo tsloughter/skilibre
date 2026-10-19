@@ -42,6 +42,7 @@ Touch controls track fingers separately, allowing a hop while holding a steering
 - `scripts/game.gd`: course generation, fixed camera, movement, collectibles, jumps, forgiving bumps, run states, audio, and local preferences.
 - `scripts/interface.gd`: character portraits, menus, touch controls, progress, pause, and celebration.
 - `scripts/skier_pose.gd`: seated poses, independent head wobble, and orbiting stars for all four Blender characters.
+- `scripts/pals.gd`: the shared roster of playable characters (model names, display names, descriptions).
 - `assets/models/*.glb`: game-ready exports of the four animals, pine, rock, jump, and star.
 - `art/snow_pals.blend`: editable Blender asset library, arranged in a grid. This directory is excluded from Godot's asset importer, so opening the game does not require Blender.
 - `tools/build_assets.py`: reproducible Blender geometry/material generator and glTF exporter.

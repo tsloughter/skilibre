@@ -107,11 +107,11 @@ func run() -> void:
 	check(game.distance==distance,"pause freezes the run")
 	await press(JOY_BUTTON_START)
 	check(game.state==game.State.SKIING,"+ also resumes")
-	# Even a clicked/focused HUD button must not hijack A or D-pad input.
-	game.ui.mute_button.grab_focus()
+	# HUD buttons cannot take focus during a run, so A can never activate one.
+	check(game.ui.mute_button.focus_mode==Control.FOCUS_NONE and game.ui.pause_button.focus_mode==Control.FOCUS_NONE,"HUD buttons refuse focus while skiing")
 	var muted: bool = game.muted
 	await press(JOY_BUTTON_B)
-	check(game.jump_time>0 and game.muted==muted,"A hops instead of activating a focused HUD button")
+	check(game.jump_time>0 and game.muted==muted,"A hops instead of activating a HUD button")
 	game.jump_time = 0
 	game._begin_crash(game.skier)
 	await press(JOY_BUTTON_B)

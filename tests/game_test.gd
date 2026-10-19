@@ -77,13 +77,13 @@ func run() -> void:
 	game.ui.left_held = false
 	var touch := InputEventScreenTouch.new()
 	touch.index = 0
-	touch.position = Vector2(60,720)
+	touch.position = game.ui.touch_buttons["left"].get_global_rect().get_center()
 	touch.pressed = true
 	game.ui._input(touch)
 	check(game.ui.left_held,"touch left button holds steering")
 	var second_touch := InputEventScreenTouch.new()
 	second_touch.index = 1
-	second_touch.position = Vector2(1160,720)
+	second_touch.position = game.ui.touch_buttons["hop"].get_global_rect().get_center()
 	second_touch.pressed = true
 	game.ui._input(second_touch)
 	check(game.ui.left_held and game.jump_time>0,"second finger hops while steering")

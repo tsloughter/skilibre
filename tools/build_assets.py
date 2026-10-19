@@ -3,6 +3,7 @@ Creates editable art/snow_pals.blend and ready-to-import assets/models/*.glb.
 All geometry and materials are original; no downloaded model dependencies.
 """
 import bpy
+import bmesh
 import math
 from pathlib import Path
 from mathutils import Vector
@@ -23,6 +24,9 @@ def mat(name, hex_color):
     bsdf = m.node_tree.nodes.get('Principled BSDF')
     bsdf.inputs['Base Color'].default_value = (*rgb, 1)
     bsdf.inputs['Roughness'].default_value = .8
+    # Single-sided: the glTF exporter writes doubleSided otherwise and Godot
+    # then disables face culling on every surface.
+    m.use_backface_culling = True
     return m
 
 M = {k:mat(k,v) for k,v in dict(snow='F6FCFF', cream='FFF0D9', fox='E88C53',
@@ -56,9 +60,19 @@ def box(name, loc, scale, material, bevel=.1):
         o.modifiers.new('Weighted normals','WEIGHTED_NORMAL')
     return o
 
-def cone(name, loc, radius, depth, material, radius_top=0):
+def cone(name, loc, radius, depth, material, radius_top=0, smooth=False):
     bpy.ops.mesh.primitive_cone_add(vertices=12, radius1=radius, radius2=radius_top, depth=depth, location=loc)
-    return finish(bpy.context.object,name,material)
+    o=finish(bpy.context.object,name,material)
+    if smooth:
+        for p in o.data.polygons: p.use_smooth=True
+    return o
+
+def consistent_normals(mesh):
+    """Hand-built faces may be wound either way; make every face point outward."""
+    mesh.validate()
+    bm=bmesh.new(); bm.from_mesh(mesh)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(mesh); bm.free(); mesh.update()
 
 def line(name, points, material, width=.025):
     data=bpy.data.curves.new(name,'CURVE'); data.dimensions='3D'; data.bevel_depth=width; data.bevel_resolution=3
@@ -100,8 +114,8 @@ def animal(kind):
     sphere('Head',(0,-.05,1.91),(.64,.53,.61),fur)
     if kind=='fox':
         for side in [-1,1]:
-            cone('Pointy ear',(side*.43,.0,2.52),.28,.65,'fox')
-            ear=cone('Inner ear',(side*.43,-.16,2.52),.16,.4,'cream'); ear.scale.y=.25
+            cone('Pointy ear',(side*.43,.0,2.52),.28,.65,'fox',smooth=True)
+            ear=cone('Inner ear',(side*.43,-.16,2.52),.16,.4,'cream',smooth=True); ear.scale.y=.25
             sphere('Fluffy cheek',(side*.3,-.43,1.76),(.35,.22,.3),'cream')
     elif kind=='bunny':
         for side in [-1,1]:
@@ -125,7 +139,8 @@ def animal(kind):
         sphere('Button nose',(0,-.665,1.82),(.085,.065,.065),'ink' if kind!='bunny' else 'pink')
         line('Smile',[(-.13,-.604,1.69),(-.065,-.63,1.66),(0,-.641,1.69),(.065,-.63,1.66),(.13,-.604,1.69)],'ink',.013)
     bpy.ops.mesh.primitive_torus_add(major_radius=.4,minor_radius=.115,major_segments=24,minor_segments=8,location=(0,-.01,1.46))
-    finish(bpy.context.object,'Cozy scarf',scarf)
+    knit=finish(bpy.context.object,'Cozy scarf',scarf)
+    for p in knit.data.polygons: p.use_smooth=True
     tail=box('Scarf tail',(.36,.35,1.26),(.22,.14,.63),scarf,.06); tail.rotation_euler[1]=-.3
     export(kind)
 
@@ -147,7 +162,7 @@ start('ramp')
 # A soft snow ramp, with a colorful lip visible from the overhead camera.
 verts=[(-1,-1,0),(1,-1,0),(1,1,0),(-1,1,0),(-1,-1,.55),(1,-1,.55)]
 faces=[(0,3,2,1),(0,1,5,4),(0,4,3),(1,2,5),(3,4,5,2)]
-mesh=bpy.data.meshes.new('Ramp');mesh.from_pydata(verts,[],faces);mesh.update()
+mesh=bpy.data.meshes.new('Ramp');mesh.from_pydata(verts,[],faces);consistent_normals(mesh)
 obj=bpy.data.objects.new('Snow jump',mesh);current.objects.link(obj);mesh.materials.append(M['snow'])
 box('Sunny jump edge',(0,-1,.55),(2.1,.18,.12),'gold',.05)
 export('ramp')
@@ -160,7 +175,7 @@ for y in [-.1,.1]:
         verts.append((math.cos(a)*r,y,math.sin(a)*r))
 faces=[tuple(reversed(range(10))),tuple(range(10,20))]
 faces += [(i,(i+1)%10,(i+1)%10+10,i+10) for i in range(10)]
-mesh=bpy.data.meshes.new('Five pointed star');mesh.from_pydata(verts,[],faces);mesh.update()
+mesh=bpy.data.meshes.new('Five pointed star');mesh.from_pydata(verts,[],faces);consistent_normals(mesh)
 obj=bpy.data.objects.new('Pocket sunshine',mesh);current.objects.link(obj);mesh.materials.append(M['gold'])
 bevel=obj.modifiers.new('Rounded star corners','BEVEL');bevel.width=.055;bevel.segments=3
 obj.modifiers.new('Weighted normals','WEIGHTED_NORMAL')

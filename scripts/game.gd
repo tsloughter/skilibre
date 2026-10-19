@@ -633,6 +633,11 @@ func _save_settings() -> void:
 
 func _capture() -> void:
 	# Reproducible real-engine screenshots for visual QA, never a mock rendering.
+	# The window steals focus when it opens, so stray clicks and keys must not
+	# start a run or press a button mid-capture.
+	get_viewport().gui_disable_input = true
+	set_process_unhandled_input(false)
+	ui.set_process_input(false)
 	if capture_mode != "menu":
 		start_run()
 		if capture_mode == "game":
